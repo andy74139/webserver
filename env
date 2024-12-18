@@ -1,0 +1,15 @@
+# Database
+DB_SERVICE_NAME: db
+DB_PASSWORD: capooisverycute
+DB_NAME: postgres
+DB_PORT: 5432
+
+# Cache
+CACHE_SERVICE_NAME: cache
+CACHE_PORT: 6379
+
+# Backend-Golang
+BACKEND_IMAGE_NAME: golang:1.23
+
+# Web server
+WEB_PORT: 8080

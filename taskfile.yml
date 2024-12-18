@@ -1,0 +1,94 @@
+#language=bash
+
+version: '3'
+
+dotenv: [ 'env' ]
+
+tasks:
+  ## main tasks
+  start-server:
+    desc: Create and start infra and server
+    aliases: [ start ]
+    preconditions:
+      - sh: if [ "$(docker ps | grep webserver-server)" ]; then exit 1; fi
+        msg: "Server is running."
+    cmds:
+      - if [ -z "$(docker ps -a | grep webserver-db-1 )" ];
+        then docker compose up -d; go run src/cmd/database/main.go init;
+        else docker compose up -d;
+        fi
+
+  stop-server:
+    desc: Stop infra and server
+    aliases: [ stop ]
+    cmds:
+      - docker compose stop
+      - docker rm webserver-server-1
+      - docker rmi webserver-server
+
+  remove-server:
+    desc: Stop and remove infra and server, remove all containers. It cleans DB data
+    aliases: [ remove ]
+    cmds:
+      - docker compose down
+      - docker rmi webserver-server | true
+
+  migrate-db:
+    desc: UNDONE!! migrate database
+    cmds:
+      - go run src/cmd/database/main.go migrate
+
+  ## development tasks
+
+  rebuild-server:
+    desc: For development, rebuild server when server is running
+    aliases: [ rebuild ]
+    cmds:
+      - docker compose up -d --no-deps --build server
+
+  watch-server:
+    desc: For development, create and start infra and server in watch mode
+    cmds:
+      - task: start-server
+      - docker compose watch
+
+  ## document tasks
+  ### Prerequisite: Install go-swagger3: https://github.com/parvez3019/go-swagger3
+  start-docs:
+    desc: Start swagger docs server
+    aliases: [ docs ]
+    cmds:
+      - task: update-docs
+      - if [ -z "$(docker ps -a | grep swagger-server )" ];
+        then docker run --name swagger-server -p 8090:8080 -e SWAGGER_JSON=/tmp/oas.json -v $(pwd)/tmp:/tmp -d swaggerapi/swagger-ui;
+        else docker start swagger-server;
+        fi
+
+  stop-docs:
+    desc: Stop swagger docs server
+    cmds:
+      - docker stop swagger-server
+
+  update-docs:
+    desc: Refresh swagger documents
+    cmds:
+      - go-swagger3 --main-file-path ./src/app/app.go --output tmp/oas.json --schema-without-pkg
+
+  quality-checks:
+    cmds:
+      - go vet ./...
+      - ineffassign ./...
+      - gocyclo src/*
+      - task: test
+      - task: testcover
+
+  # run tests
+  test:
+    preconditions:
+      - mkdir tmp | true
+    cmds:
+      - go test -coverprofile=tmp/c.out ./...
+
+  testcover:
+    cmds:
+      - go tool cover -html=tmp/c.out
